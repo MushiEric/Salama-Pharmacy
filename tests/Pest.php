@@ -1,49 +1,94 @@
 <?php
 
+use App\Modules\Identity\Application\Services\TenantProvisioningService;
+use App\Modules\Identity\Domain\PermissionCatalog;
+use App\Modules\Identity\Models\Permission;
+use App\Modules\Identity\Models\Role;
+use App\Modules\Identity\Models\User;
+use App\Modules\Subscription\Models\Package;
+use App\Modules\Subscription\Models\TenantSubscription;
+use App\Modules\Tenancy\Models\Branch;
+use App\Modules\Tenancy\Models\Tenant;
+use Database\Seeders\PackageSeeder;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/*
-|--------------------------------------------------------------------------
-| Test Case
-|--------------------------------------------------------------------------
-|
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind a different classes or traits.
-|
-*/
-
 pest()->extend(TestCase::class)
- // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
+    ->beforeEach(function (): void {
+        $this->seed(RbacSeeder::class);
+        $this->seed(PackageSeeder::class);
+    })
     ->in('Feature');
-
-/*
-|--------------------------------------------------------------------------
-| Expectations
-|--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
-*/
 
 expect()->extend('toBeOne', function () {
     return $this->toBe(1);
 });
 
-/*
-|--------------------------------------------------------------------------
-| Functions
-|--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
-*/
-
-function something()
+/**
+ * @return array{tenant: Tenant, branch: Branch, admin: User, role: Role, subscription: TenantSubscription}
+ */
+function provisionPharmacy(string $suffix = 'a', string $packageSlug = 'standard'): array
 {
-    // ..
+    $package = Package::query()->where('slug', $packageSlug)->firstOrFail();
+
+    return app(TenantProvisioningService::class)->provision([
+        'name' => 'Pharmacy '.strtoupper($suffix),
+        'admin_name' => 'Admin '.$suffix,
+        'admin_email' => 'admin-'.$suffix.'@pharmacy.test',
+        'admin_password' => 'password',
+        'branch_name' => 'Main '.$suffix,
+        'package_id' => $package->id,
+    ]);
+}
+
+function platformSuperadmin(): User
+{
+    return app(TenantProvisioningService::class)->createPlatformSuperadmin(
+        'Platform Superadmin',
+        'super-'.fake()->unique()->userName().'@salama.test',
+        'password',
+    );
+}
+
+/**
+ * @param  array{tenant: Tenant, branch: Branch, admin: User, role: Role}  $pharmacy
+ * @param  list<string>  $permissionCodes
+ */
+function operationalUser(array $pharmacy, array $permissionCodes = [PermissionCatalog::SALE_CREATE]): User
+{
+    $role = Role::factory()->create([
+        'tenant_id' => $pharmacy['tenant']->id,
+        'name' => 'Cashier',
+        'slug' => 'cashier-'.fake()->unique()->numerify('###'),
+        'is_system' => false,
+    ]);
+
+    $permissions = Permission::query()->whereIn('code', $permissionCodes)->get();
+    $sync = [];
+
+    foreach ($permissions as $permission) {
+        $sync[$permission->id] = ['tenant_id' => $pharmacy['tenant']->id];
+    }
+
+    $role->permissions()->sync($sync);
+
+    $user = User::factory()->create([
+        'tenant_id' => $pharmacy['tenant']->id,
+        'branch_id' => $pharmacy['branch']->id,
+    ]);
+
+    $user->roles()->attach($role->id, ['tenant_id' => $pharmacy['tenant']->id]);
+
+    return $user;
+}
+
+function spa(): TestCase
+{
+    return test()->withHeaders([
+        'Origin' => 'http://localhost',
+        'Referer' => 'http://localhost/',
+    ])->withoutMiddleware(ValidateCsrfToken::class);
 }

@@ -31,5 +31,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="SANCTUM_STATEFUL_DOMAINS" value="localhost,127.0.0.1"/>
+        <env name="CORS_ALLOWED_ORIGINS" value="http://localhost"/>
     </php>
 </phpunit>

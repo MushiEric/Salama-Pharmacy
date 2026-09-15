@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
+use App\Modules\Identity\Domain\Enums\UserStatus;
+use App\Modules\Identity\Models\User;
+use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -12,33 +14,40 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
+    protected $model = User::class;
+
     protected static ?string $password;
 
     /**
-     * Define the model's default state.
-     *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         return [
+            'tenant_id' => Tenant::factory(),
+            'branch_id' => null,
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
+            'phone' => fake()->unique()->e164PhoneNumber(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'status' => UserStatus::Active,
             'remember_token' => Str::random(10),
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
+    public function platform(): static
+    {
+        return $this->state(fn (): array => [
+            'tenant_id' => null,
+            'branch_id' => null,
+            'phone' => null,
+        ]);
+    }
+
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn (): array => [
             'email_verified_at' => null,
         ]);
     }

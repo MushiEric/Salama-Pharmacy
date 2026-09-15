@@ -24,6 +24,12 @@ RUN apk add --no-cache \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+RUN { \
+        echo 'memory_limit=512M'; \
+        echo 'upload_max_filesize=20M'; \
+        echo 'post_max_size=20M'; \
+    } > /usr/local/etc/php/conf.d/99-salamapharma.ini
+
 RUN addgroup -g ${WWWGROUP} sail \
     && adduser -D -u ${WWWUSER} -G sail -s /bin/bash sail
 

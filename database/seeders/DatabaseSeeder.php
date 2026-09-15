@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Modules\Identity\Application\Services\TenantProvisioningService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,11 +15,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call(RbacSeeder::class);
+        $this->call(PackageSeeder::class);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        app(TenantProvisioningService::class)->createPlatformSuperadmin(
+            'Platform Superadmin',
+            'superadmin@salamapharma.test',
+            'password',
+        );
     }
 }

@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.4",
         "laravel/framework": "^12.0",
+        "laravel/sanctum": "^4.3",
         "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
@@ -27,7 +28,10 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Modules/Tenancy/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
