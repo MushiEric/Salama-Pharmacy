@@ -3,6 +3,8 @@
 use App\Modules\Identity\Domain\PermissionCatalog;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Models\InventoryBatch;
+use App\Modules\PharmacyProduct\Models\PharmacyProduct;
 use App\Modules\Subscription\Models\TenantSubscription;
 use App\Modules\Tenancy\Application\TenantContext;
 use App\Modules\Tenancy\Infrastructure\Persistence\TenantScope;
@@ -167,4 +169,63 @@ test('tenant scope remains the only implicit filter and is not disabled by clien
         ->assertJsonMissing(['id' => $beta['branch']->id]);
 
     expect(array_key_exists(TenantScope::class, (new Branch)->getGlobalScopes()))->toBeTrue();
+});
+
+test('a tenant cannot fetch or mutate another tenant\'s product', function () {
+    $alpha = provisionPharmacy('iso-product-a');
+    $beta = provisionPharmacy('iso-product-b');
+    $betaProduct = PharmacyProduct::factory()->create(['tenant_id' => $beta['tenant']->id]);
+
+    $this->actingAs($alpha['admin'])
+        ->getJson('/api/products/'.$betaProduct->id)
+        ->assertNotFound();
+
+    $this->actingAs($alpha['admin'])
+        ->patchJson('/api/products/'.$betaProduct->id, ['local_name' => 'Hijacked'])
+        ->assertNotFound();
+});
+
+test('a tenant cannot add a unit to another tenant\'s product', function () {
+    $alpha = provisionPharmacy('iso-unit-a');
+    $beta = provisionPharmacy('iso-unit-b');
+    $betaProduct = PharmacyProduct::factory()->create(['tenant_id' => $beta['tenant']->id]);
+
+    $this->actingAs($alpha['admin'])
+        ->postJson("/api/products/{$betaProduct->id}/units", [
+            'name' => 'Intruder Unit',
+            'multiplier_to_base' => 1,
+        ])
+        ->assertNotFound();
+});
+
+test('a tenant\'s inventory balance and batch listing never include another tenant\'s stock', function () {
+    $alpha = provisionPharmacy('iso-inventory-a');
+    $beta = provisionPharmacy('iso-inventory-b');
+    $alphaProduct = PharmacyProduct::factory()->create(['tenant_id' => $alpha['tenant']->id]);
+    $betaProduct = PharmacyProduct::factory()->create(['tenant_id' => $beta['tenant']->id]);
+
+    InventoryBatch::factory()->create([
+        'tenant_id' => $alpha['tenant']->id,
+        'branch_id' => $alpha['branch']->id,
+        'pharmacy_product_id' => $alphaProduct->id,
+        'available_quantity_base' => 40,
+    ]);
+    $betaBatch = InventoryBatch::factory()->create([
+        'tenant_id' => $beta['tenant']->id,
+        'branch_id' => $beta['branch']->id,
+        'pharmacy_product_id' => $betaProduct->id,
+        'available_quantity_base' => 999,
+    ]);
+
+    $this->actingAs($alpha['admin'])
+        ->getJson('/api/inventory')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonMissing(['pharmacy_product_id' => $betaProduct->id]);
+
+    $this->actingAs($alpha['admin'])
+        ->getJson('/api/inventory/batches')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonMissing(['id' => $betaBatch->id]);
 });

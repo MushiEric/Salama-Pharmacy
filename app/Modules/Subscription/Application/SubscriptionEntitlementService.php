@@ -3,6 +3,7 @@
 namespace App\Modules\Subscription\Application;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\PharmacyProduct\Models\PharmacyProduct;
 use App\Modules\Subscription\Models\Package;
 use App\Modules\Subscription\Models\TenantSubscription;
 use App\Modules\Tenancy\Application\TenantContext;
@@ -77,6 +78,15 @@ class SubscriptionEntitlementService
             countCallback: fn (): int => User::query()->count(),
             limitCallback: fn (Package $package): ?int => $package->max_users,
             message: 'User limit reached for the current subscription package.',
+        );
+    }
+
+    public function assertStockLimit(): void
+    {
+        $this->assertCountLimit(
+            countCallback: fn (): int => PharmacyProduct::query()->count(),
+            limitCallback: fn (Package $package): ?int => $package->max_stock_items,
+            message: 'Product limit reached for the current subscription package.',
         );
     }
 

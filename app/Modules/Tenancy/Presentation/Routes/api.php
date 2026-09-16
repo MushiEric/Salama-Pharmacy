@@ -3,6 +3,7 @@
 use App\Modules\Identity\Domain\PermissionCatalog;
 use App\Modules\Tenancy\Presentation\Http\Controllers\BranchController;
 use App\Modules\Tenancy\Presentation\Http\Controllers\TenantController;
+use App\Modules\Tenancy\Presentation\Http\Controllers\TenantSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'tenant.context', 'branch.context'])->group(function (): void {
@@ -23,5 +24,10 @@ Route::middleware(['auth:sanctum', 'tenant.context', 'branch.context'])->group(f
             ->middleware('permission:'.PermissionCatalog::BRANCH_VIEW);
         Route::patch('/branches/{branch}', [BranchController::class, 'update'])
             ->middleware('permission:'.PermissionCatalog::BRANCH_MANAGE);
+
+        Route::get('/tenant/settings', [TenantSettingsController::class, 'show'])
+            ->middleware('permission:'.PermissionCatalog::SETTINGS_MANAGE);
+        Route::patch('/tenant/settings', [TenantSettingsController::class, 'update'])
+            ->middleware('permission:'.PermissionCatalog::SETTINGS_MANAGE);
     });
 });

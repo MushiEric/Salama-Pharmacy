@@ -5,6 +5,7 @@ namespace App\Modules\Tenancy\Models;
 use App\Modules\Identity\Models\User;
 use App\Modules\Subscription\Models\TenantSubscription;
 use App\Modules\Tenancy\Domain\Enums\TenantStatus;
+use App\Modules\Tenancy\Domain\ValueObjects\TenantSettings;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property TenantStatus $status
+ * @property array<string, mixed> $settings
  */
 class Tenant extends Model
 {
@@ -67,6 +69,11 @@ class Tenant extends Model
     public function isActive(): bool
     {
         return $this->status === TenantStatus::Active;
+    }
+
+    public function settings(): TenantSettings
+    {
+        return TenantSettings::fromArray($this->getAttribute('settings') ?? []);
     }
 
     protected static function newFactory(): TenantFactory
